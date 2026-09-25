@@ -4,8 +4,9 @@ A tap-to-play math game for young kids, made for iPad.
 
 - **Pick the math:** Adding (+), Take away (−), Groups of (×), or any mix
 - **Pick the size:** numbers up to 5, 10, or 20
-- Pictures for every problem; tap them to count out loud
-- Questions are read aloud, with friendly hints after a wrong answer
+- Pictures for every problem; tap them to number them while counting
+- Friendly written hints after a wrong answer
+- Sounds only for results: a chime when right, a soft boop when wrong, a fanfare at the end
 - 10 questions per round, a star for each one
 
 It's a single `index.html` with no build step and no dependencies.

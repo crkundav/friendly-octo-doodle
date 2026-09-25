@@ -175,6 +175,7 @@
     flex: none;
   }
   .round-btn:active { transform: translateY(3px); }
+  .round-spacer { width: 64px; flex: none; }
 
   .progress { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; }
   .progress span {
@@ -393,7 +394,7 @@
   <div class="topbar">
     <button class="round-btn" id="homeBtn" aria-label="Go home">🏠</button>
     <div class="progress" id="progress"></div>
-    <button class="round-btn" id="sayBtn" aria-label="Say it again">🔊</button>
+    <span class="round-spacer" aria-hidden="true"></span>
   </div>
 
   <p class="problem" id="problem"></p>
@@ -419,9 +420,9 @@
   const THINGS = ["🍎", "🍓", "⭐", "🐟", "🦋", "🍪", "🐞", "🌸", "🚗", "🐶", "🎈", "🍩", "🐥", "⚽"];
   const PRAISE = ["Yes!", "Great job!", "You got it!", "Awesome!", "Super!", "Hooray!", "Way to go!"];
   const OPS = {
-    add: { sym: "+", say: "plus", color: "var(--add)" },
-    sub: { sym: "−", say: "take away", color: "var(--sub)" },
-    mul: { sym: "×", say: "groups of", color: "var(--mul)" },
+    add: { sym: "+", color: "var(--add)" },
+    sub: { sym: "−", color: "var(--sub)" },
+    mul: { sym: "×", color: "var(--mul)" },
   };
 
   const $ = (id) => document.getElementById(id);
@@ -469,7 +470,6 @@
     } else {
       settings.ops.push(op);
     }
-    blip(660, 0.08);
     saveSettings();
     renderHome();
   });
@@ -478,13 +478,19 @@
     const b = e.target.closest(".size");
     if (!b) return;
     settings.max = Number(b.dataset.max);
-    blip(660, 0.08);
     saveSettings();
     renderHome();
   });
 
-  // ---------- Sound + speech ----------
+  // ---------- Sounds (only for answers and the end of a round) ----------
   let audio = null;
+  function unlockAudio() {
+    // iPad Safari only allows sound after a tap, so start the audio engine on "Play".
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      if (audio.state === "suspended") audio.resume();
+    } catch (e) {}
+  }
   function blip(freq, dur, type = "sine", when = 0) {
     try {
       audio = audio || new (window.AudioContext || window.webkitAudioContext)();
@@ -505,25 +511,6 @@
   const cheer = () => [523, 659, 784, 1047].forEach((f, i) => blip(f, 0.18, "triangle", i * 0.09));
   const boop = () => { blip(260, 0.18, "square"); blip(200, 0.22, "square", 0.12); };
 
-  let voice = null;
-  function chooseVoice() {
-    const voices = window.speechSynthesis ? speechSynthesis.getVoices() : [];
-    const en = voices.filter((v) => /^en/i.test(v.lang));
-    voice = en.find((v) => /samantha|karen|moira|tessa|kathy/i.test(v.name)) || en[0] || null;
-  }
-  if (window.speechSynthesis) {
-    chooseVoice();
-    speechSynthesis.onvoiceschanged = chooseVoice;
-  }
-  function say(text) {
-    if (!window.speechSynthesis) return;
-    speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    if (voice) u.voice = voice;
-    u.rate = 0.9;
-    u.pitch = 1.15;
-    speechSynthesis.speak(u);
-  }
 
   // ---------- Questions ----------
   function pairs(op, max) {
@@ -564,10 +551,6 @@
       if (n >= 0) choices.add(n);
     }
     return { op, a, b, answer, thing: pick(THINGS), choices: shuffle([...choices]) };
-  }
-
-  function spoken(q) {
-    return `${q.a} ${OPS[q.op].say} ${q.b}`;
   }
 
   // ---------- Round ----------
@@ -628,7 +611,6 @@
       box.appendChild(b);
     });
 
-    say(`${spoken(q)}. How many?`);
   }
 
   function makeObj(i) {
@@ -694,8 +676,6 @@
     badge.className = "badge";
     badge.textContent = counted;
     o.appendChild(badge);
-    blip(440 + counted * 30, 0.1, "triangle");
-    say(String(counted));
   });
 
   $("answers").addEventListener("click", (e) => {
@@ -713,7 +693,6 @@
       confetti(b);
       const praise = pick(PRAISE);
       $("hint").textContent = `${praise} ${q.a} ${OPS[q.op].sym} ${q.b} = ${q.answer}`;
-      say(`${praise} ${spoken(q)} is ${q.answer}!`);
       round.stars.push(wrongTries === 0 ? "gold" : "ok");
       round.index++;
       renderProgress();
@@ -726,7 +705,6 @@
                 : q.op === "mul" ? "Count all the things in the boxes!"
                 : "Count them all together!";
       $("hint").textContent = `Almost! ${tip}`;
-      say(`Try again! ${tip}`);
     }
   });
 
@@ -740,7 +718,6 @@
     cheer();
     setTimeout(cheer, 450);
     confetti($("doneStars"), 60);
-    say("You did it! Great job!");
   }
 
   // ---------- Effects ----------
@@ -770,19 +747,13 @@
     el.classList.remove("nudge");
     void el.offsetWidth;
     el.classList.add("nudge");
-    boop();
   }
 
   // ---------- Buttons ----------
-  $("playBtn").addEventListener("click", () => { blip(880, 0.1); startRound(); });
-  $("againBtn").addEventListener("click", startRound);
+  $("playBtn").addEventListener("click", () => { unlockAudio(); startRound(); });
+  $("againBtn").addEventListener("click", () => { unlockAudio(); startRound(); });
   $("changeBtn").addEventListener("click", () => { renderHome(); show("home"); });
-  $("homeBtn").addEventListener("click", () => {
-    if (window.speechSynthesis) speechSynthesis.cancel();
-    renderHome();
-    show("home");
-  });
-  $("sayBtn").addEventListener("click", () => q && say(`${spoken(q)}. How many?`));
+  $("homeBtn").addEventListener("click", () => { renderHome(); show("home"); });
 
   // Stop iOS double-tap zoom and pinch zoom from interrupting play.
   document.addEventListener("gesturestart", (e) => e.preventDefault());
