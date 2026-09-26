@@ -308,10 +308,53 @@
   .answers.locked .answer { pointer-events: none; }
 
   /* ---------- Done ---------- */
-  #done { justify-content: center; gap: 24px; text-align: center; }
-  #done h2 { font-size: clamp(56px, 10vw, 96px); margin: 0; }
-  #doneStars { font-size: clamp(36px, 6vw, 56px); letter-spacing: 4px; }
-  #doneMsg { font-size: clamp(26px, 4vw, 36px); color: var(--ink-soft); margin: 0; }
+  /* margin:auto centers vertically but still scrolls from the top if it's too tall */
+  #done { gap: clamp(10px, 2vh, 20px); text-align: center; overflow-y: auto; }
+  #done > :first-child { margin-top: auto; }
+  #done > :last-child { margin-bottom: auto; }
+  #done h2 { font-size: clamp(44px, 7vw, 76px); margin: 0; }
+  #doneStars { font-size: clamp(26px, 4vw, 40px); letter-spacing: 4px; }
+  #done .row { align-items: center; }
+  #done .play { margin-top: 0; padding: 16px 48px; font-size: clamp(32px, 4.5vw, 44px); }
+  #doneMsg { font-size: clamp(22px, 3.2vw, 30px); color: var(--ink-soft); margin: 0; }
+
+  .tallies { display: flex; gap: clamp(12px, 2vw, 24px); justify-content: center; flex-wrap: wrap; }
+  .tally {
+    min-width: clamp(150px, 22vw, 220px);
+    padding: 14px 20px;
+    border-radius: 28px;
+    background: var(--card);
+    box-shadow: var(--shadow);
+    border: 5px solid transparent;
+  }
+  .tally .num { display: block; font-size: clamp(56px, 9vw, 84px); font-weight: 700; line-height: 1; }
+  .tally .what { display: block; font-size: clamp(18px, 2.4vw, 22px); font-weight: 600; color: var(--ink-soft); margin-top: 6px; }
+  .tally.right { border-color: var(--good); }
+  .tally.right .num { color: var(--good); }
+  .tally.wrong { border-color: var(--sub); }
+  .tally.wrong .num { color: var(--sub); }
+
+  .bytype { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin: 0; }
+  .bytype span {
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.8);
+    font-size: clamp(18px, 2.4vw, 22px);
+    font-weight: 600;
+  }
+  .bytype b { color: var(--opc); font-size: 1.3em; line-height: 1; }
+
+  .tricky { margin: 0; }
+  .tricky .label { margin-bottom: 8px; }
+  .tricky .chips { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .tricky .chips span {
+    padding: 6px 16px;
+    border-radius: 16px;
+    background: var(--sub-soft);
+    border: 3px solid var(--sub);
+    font-size: clamp(22px, 3vw, 28px);
+    font-weight: 600;
+  }
   .secondary {
     padding: 16px 40px;
     font-size: 30px;
@@ -407,11 +450,20 @@
 <section id="done" class="screen" aria-label="All done">
   <h2>You did it! 🎉</h2>
   <div id="doneStars"></div>
+  <div class="tallies">
+    <div class="tally right"><span class="num" id="rightCount">0</span><span class="what">✅ Right first try</span></div>
+    <div class="tally wrong"><span class="num" id="wrongCount">0</span><span class="what">🔁 Needed another try</span></div>
+  </div>
+  <p class="bytype" id="byType"></p>
+  <div class="tricky" id="tricky" hidden>
+    <p class="label">Tricky ones to practice</p>
+    <div class="chips" id="trickyList"></div>
+  </div>
   <p id="doneMsg"></p>
   <div class="row">
     <button class="play" id="againBtn">Play again</button>
+    <button class="secondary" id="changeBtn">Pick different math</button>
   </div>
-  <button class="secondary" id="changeBtn">Pick different math</button>
 </section>
 
 <script>
@@ -566,7 +618,7 @@
   }
 
   function startRound() {
-    round = { index: 0, stars: [] };
+    round = { index: 0, results: [] };
     show("game");
     nextQuestion();
   }
@@ -577,7 +629,7 @@
     for (let i = 0; i < QUESTIONS_PER_ROUND; i++) {
       const s = document.createElement("span");
       s.textContent = "⭐";
-      if (i < round.stars.length) s.classList.add("got");
+      if (i < round.results.length) s.classList.add("got");
       p.appendChild(s);
     }
   }
@@ -693,7 +745,7 @@
       confetti(b);
       const praise = pick(PRAISE);
       $("hint").textContent = `${praise} ${q.a} ${OPS[q.op].sym} ${q.b} = ${q.answer}`;
-      round.stars.push(wrongTries === 0 ? "gold" : "ok");
+      round.results.push({ op: q.op, a: q.a, b: q.b, answer: q.answer, wrong: wrongTries });
       round.index++;
       renderProgress();
       nextTimer = setTimeout(nextQuestion, 2600);
@@ -710,11 +762,33 @@
 
   function finishRound() {
     show("done");
-    const firstTry = round.stars.filter((s) => s === "gold").length;
-    $("doneStars").textContent = "⭐".repeat(round.stars.length);
-    $("doneMsg").textContent = firstTry === QUESTIONS_PER_ROUND
+    const results = round.results;
+    const missed = results.filter((r) => r.wrong > 0);
+    const wrongTaps = missed.reduce((n, r) => n + r.wrong, 0);
+    const firstTry = results.length - missed.length;
+
+    $("doneStars").textContent = "⭐".repeat(results.length);
+    $("rightCount").textContent = firstTry;
+    $("wrongCount").textContent = missed.length;
+
+    // Per-type breakdown, only when the round mixed more than one type.
+    const types = Object.keys(OPS).filter((op) => results.some((r) => r.op === op));
+    $("byType").innerHTML = types.length < 2 ? "" : types.map((op) => {
+      const mine = results.filter((r) => r.op === op);
+      const good = mine.filter((r) => r.wrong === 0).length;
+      return `<span style="--opc:${OPS[op].color}"><b>${OPS[op].sym}</b> ${good} of ${mine.length} right</span>`;
+    }).join("");
+
+    // Each missed problem once, with its answer.
+    const seen = new Set();
+    const tricky = missed.map((r) => `${r.a} ${OPS[r.op].sym} ${r.b} = ${r.answer}`)
+      .filter((t) => !seen.has(t) && seen.add(t));
+    $("trickyList").innerHTML = tricky.map((t) => `<span>${t}</span>`).join("");
+    $("tricky").hidden = tricky.length === 0;
+
+    $("doneMsg").textContent = missed.length === 0
       ? "Every one right on the first try!"
-      : `${firstTry} right on the first try. Keep going!`;
+      : `${wrongTaps} wrong ${wrongTaps === 1 ? "tap" : "taps"} this round. Keep going!`;
     cheer();
     setTimeout(cheer, 450);
     confetti($("doneStars"), 60);

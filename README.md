@@ -8,6 +8,7 @@ A tap-to-play math game for young kids, made for iPad.
 - Friendly written hints after a wrong answer
 - Sounds only for results: a chime when right, a soft boop when wrong, a fanfare at the end
 - 10 questions per round, a star for each one
+- End-of-round stats: right first try vs. needed another try, a breakdown by type, and the tricky problems to practice
 
 It's a single `index.html` with no build step and no dependencies.
 
