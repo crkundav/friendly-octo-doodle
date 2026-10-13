@@ -257,18 +257,7 @@
     height: calc(var(--em) * 1.15);
     display: grid; place-items: center;
     position: relative;
-    background: none;
-    padding: 0;
     animation: drop 0.35s backwards;
-  }
-  .obj .badge {
-    position: absolute; top: -4px; right: -4px;
-    min-width: 30px; height: 30px; padding: 0 6px;
-    border-radius: 999px;
-    background: #3b82f6; color: #fff;
-    font-size: 20px; font-weight: 700;
-    display: grid; place-items: center;
-    animation: pop 0.3s;
   }
   .obj.gone { opacity: 0.25; transition: opacity 0.6s; }
   .obj.gone::after {
@@ -281,14 +270,6 @@
     opacity: 1;
   }
   .obj.gone { filter: grayscale(0.6); }
-
-  .hint {
-    font-size: clamp(20px, 2.8vw, 26px);
-    color: var(--ink-soft);
-    margin: 0;
-    min-height: 1.3em;
-    text-align: center;
-  }
 
   .answers { display: flex; gap: clamp(16px, 3vw, 36px); justify-content: center; }
   .answer {
@@ -442,7 +423,6 @@
 
   <p class="problem" id="problem"></p>
   <div class="picture" id="picture"></div>
-  <p class="hint" id="hint"></p>
   <div class="answers" id="answers"></div>
 </section>
 
@@ -470,7 +450,6 @@
 (() => {
   const QUESTIONS_PER_ROUND = 10;
   const THINGS = ["🍎", "🍓", "⭐", "🐟", "🦋", "🍪", "🐞", "🌸", "🚗", "🐶", "🎈", "🍩", "🐥", "⚽"];
-  const PRAISE = ["Yes!", "Great job!", "You got it!", "Awesome!", "Super!", "Hooray!", "Way to go!"];
   const OPS = {
     add: { sym: "+", color: "var(--add)" },
     sub: { sym: "−", color: "var(--sub)" },
@@ -609,7 +588,6 @@
   let round = null;
   let q = null;
   let wrongTries = 0;
-  let counted = 0;
   let nextTimer = null;
 
   function show(id) {
@@ -638,7 +616,6 @@
     if (round.index >= QUESTIONS_PER_ROUND) return finishRound();
     q = makeQuestion();
     wrongTries = 0;
-    counted = 0;
     renderProgress();
 
     const color = OPS[q.op].color;
@@ -650,7 +627,6 @@
 
     renderPicture();
 
-    $("hint").textContent = "Tap the pictures to count!";
 
     const box = $("answers");
     box.classList.remove("locked");
@@ -666,11 +642,10 @@
   }
 
   function makeObj(i) {
-    const el = document.createElement("button");
+    const el = document.createElement("span");
     el.className = "obj";
     el.textContent = q.thing;
     el.style.animationDelay = `${i * 40}ms`;
-    el.setAttribute("aria-label", "count me");
     return el;
   }
 
@@ -720,16 +695,6 @@
     }
   }
 
-  $("picture").addEventListener("click", (e) => {
-    const o = e.target.closest(".obj");
-    if (!o || o.classList.contains("gone") || o.querySelector(".badge")) return;
-    counted++;
-    const badge = document.createElement("span");
-    badge.className = "badge";
-    badge.textContent = counted;
-    o.appendChild(badge);
-  });
-
   $("answers").addEventListener("click", (e) => {
     const b = e.target.closest(".answer");
     if (!b || $("answers").classList.contains("locked")) return;
@@ -743,8 +708,6 @@
       qbox.style.color = "var(--good)";
       cheer();
       confetti(b);
-      const praise = pick(PRAISE);
-      $("hint").textContent = `${praise} ${q.a} ${OPS[q.op].sym} ${q.b} = ${q.answer}`;
       round.results.push({ op: q.op, a: q.a, b: q.b, answer: q.answer, wrong: wrongTries });
       round.index++;
       renderProgress();
@@ -753,10 +716,6 @@
       wrongTries++;
       b.classList.add("wrong");
       boop();
-      const tip = q.op === "sub" ? "Count the ones that are left!"
-                : q.op === "mul" ? "Count all the things in the boxes!"
-                : "Count them all together!";
-      $("hint").textContent = `Almost! ${tip}`;
     }
   });
 
@@ -838,7 +797,6 @@
     resizeTimer = setTimeout(() => {
       if (q && $("game").classList.contains("active") && !$("answers").classList.contains("locked")) {
         renderPicture();
-        counted = 0;
       }
     }, 200);
   });
